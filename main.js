@@ -71,9 +71,10 @@
 	var rects = [];
 
 	var draggables = [].map.call(items, function(elem, index, arr) {
-	  var height = elem.offsetHeight,
-	    origRect = elem.getBoundingClientRect(),
+	  var origRect = elem.getBoundingClientRect(),
 	    rect = _.pick(origRect, ['height', 'width', 'left', 'bottom', 'right', 'top']);
+
+	  rect = _.extend(rect, { id: index });
 
 	  rects.push(rect);
 
@@ -81,47 +82,6 @@
 	    .style('translate', function(x, y) {
 	      return x + 'px, ' + y + 'px';
 	    });
-
-	  // index of the thing that's moving and y coordinate
-	  vent.on('move', function(indexOfMover, y) {
-	    if (indexOfMover === index) {
-	      return;
-	    }
-
-	    if (y > (rect.top + rect.height/2)) {
-
-	      if (indexOfMover < index) {
-	        move(draggable, -rects[activeIndex].height);
-	        rect = _.extend(rect, {
-	          top: origRect.top - rects[activeIndex].height,
-	          bottom: origRect.bottom - rects[activeIndex].height
-	        });
-	      } else {
-	        move(draggable, 0);
-	        rect = _.extend(rect, {
-	          top: origRect.top + rects[activeIndex].height,
-	          bottom: origRect.bottom + rects[activeIndex].height
-	        });
-	      }
-
-	    } else if (y < (rect.top + rect.height/2)) {
-
-	      if (indexOfMover < index) {
-	        move(draggable, 0);
-	        rect = _.extend(rect, {
-	          top: origRect.top - rects[activeIndex].height,
-	          bottom: origRect.bottom - rects[activeIndex].height
-	        });
-	      } else {
-	        move(draggable, rects[activeIndex].height);
-	        rect = _.extend(rect, {
-	          top: origRect.top + rects[activeIndex].height,
-	          bottom: origRect.bottom + rects[activeIndex].height
-	        });
-	      }
-
-	    }
-	  });
 
 	  var dragObj = draggable.drag();
 
@@ -140,6 +100,74 @@
 
 	  return draggable;
 	});
+
+
+
+	vent.on('move', function(indexOfMover, y) {
+	  // modify rects to represent where we want to go
+
+	  var index;
+
+	  if (y < rects[0].top) {
+	    index = 0;
+	  } else if (y > rects[rects.length - 1].bottom) {
+	    index = rects.length - 1;
+	  } else {
+	    index = _.findIndex(rects, function(rect) {
+	      return rect.top < y && rect.bottom > y;
+	    });
+	  }
+
+	  if (index < 0) {
+	    return;
+	  }
+
+	  // console.log(index);
+
+	  var mover = rects[indexOfMover];
+	  // deep clone
+	  var newRects = _.clone(rects, true);
+	  // remove the mover
+	  newRects.splice(indexOfMover, 1);
+	  // insert the mover after the intersecting index
+	  newRects.splice(index, 0, mover);
+
+
+	  // re-calculate positions of all rects
+
+	  var bottom = 0;
+	  newRects = newRects.map(function(rect, index, arr) {
+	    var top = index === 0 ? rects[0].top : bottom;
+
+	    bottom = top + rect.height;
+
+	    return _.extend(_.clone(rect), {
+	      top: top,
+	      bottom: bottom
+	    });
+	  });
+
+
+	  // now go and render
+	  newRects.forEach(function(rect) {
+	    var origIndex = rect.id,
+	      offset = rect.top - rects[rect.id].top;
+
+	    // console.log(origIndex, offset);
+
+	    // attach on end handler
+	    if (origIndex === activeIndex) {
+	      springAtEnd(drags[origIndex], draggables[origIndex], offset);
+
+	    // slide toward offset
+	    } else {
+	      move(draggables[origIndex], offset);
+	    }
+	  });
+
+
+	});
+
 
 
 /***/ },
