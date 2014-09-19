@@ -1,6 +1,6 @@
 var Impulse = require('impulse');
 var _ = require('lodash');
-var EventEmitter = require("events").EventEmitter;
+var EventEmitter = require('events').EventEmitter;
 
 var move = function(impulseElem, offset) {
   impulseElem.spring({ tension: 100, damping: 10 })
@@ -16,67 +16,66 @@ var springAtEnd = function(dragObj, impulseElem, offset) {
 
 var vent = new EventEmitter();
 
-// take current x, y and figure out where to move surrounding elems
-var coordinator = function(x, y) {
-  var itemIndex = _.findIndex(rects, function(item) {
-    return y > item.top && y < item.bottom;
-  });
-  if (itemIndex >= 0 && itemIndex !== activeIndex) {
-    var newOffset;
-
-    // element moving downwards
-    if (itemIndex > activeIndex) {
-      // bottom half of element
-      if (y > rects[itemIndex].top + rects[itemIndex].height/2) {
-        // move up
-        move(draggables[itemIndex], -rects[itemIndex].height);
-
-        newOffset = rects.slice(activeIndex, itemIndex).reduce(function(prev, curr) {
-          return prev + curr.height;
-        }, 0);
-        springAtEnd(drags[activeIndex], draggables[activeIndex], newOffset);
-      } else {
-        // return to origin
-        move(draggables[itemIndex], 0);
-      }
-
-    // element is moving upwards
-    } else {
-
-      // top half of element
-      if (y < rects[itemIndex].top + rects[itemIndex].height/2) {
-        // move down
-        move(draggables[itemIndex], rects[itemIndex].height);
-
-        newOffset = -rects.slice(0, activeIndex).reduce(function(prev, curr) {
-          return prev + curr.height;
-        }, 0);
-        springAtEnd(drags[activeIndex], draggables[activeIndex], newOffset);
-      } else {
-        // return to origin
-        move(draggables[itemIndex], 0);
-      }
-    }
-  }
-};
-
 var activeIndex;
 
 var items = document.getElementsByClassName('list-item');
 
-var rects = [];
-
 var drags = [];
 
-var draggables = [].map.call(items, function(elem, index, arr) {
-  var height = elem.offsetHeight;
+var rects = [];
 
-  rects.push(elem.getBoundingClientRect());
+var draggables = [].map.call(items, function(elem, index, arr) {
+  var height = elem.offsetHeight,
+    origRect = elem.getBoundingClientRect(),
+    rect = _.pick(origRect, ['height', 'width', 'left', 'bottom', 'right', 'top']);
+
+  rects.push(rect);
 
   var draggable = Impulse(elem)
     .style('translate', function(x, y) {
       return x + 'px, ' + y + 'px';
     });
+
+  // index of the thing that's moving and y coordinate
+  vent.on('move', function(indexOfMover, y) {
+    if (indexOfMover === index) {
+      return;
+    }
+
+    if (y > (rect.top + rect.height/2)) {
+
+      if (indexOfMover < index) {
+        move(draggable, -rects[activeIndex].height);
+        rect = _.extend(rect, {
+          top: origRect.top - rects[activeIndex].height,
+          bottom: origRect.bottom - rects[activeIndex].height
+        });
+      } else {
+        move(draggable, 0);
+        rect = _.extend(rect, {
+          top: origRect.top + rects[activeIndex].height,
+          bottom: origRect.bottom + rects[activeIndex].height
+        });
+      }
+
+    } else if (y < (rect.top + rect.height/2)) {
+
+      if (indexOfMover < index) {
+        move(draggable, 0);
+        rect = _.extend(rect, {
+          top: origRect.top - rects[activeIndex].height,
+          bottom: origRect.bottom - rects[activeIndex].height
+        });
+      } else {
+        move(draggable, rects[activeIndex].height);
+        rect = _.extend(rect, {
+          top: origRect.top + rects[activeIndex].height,
+          bottom: origRect.bottom + rects[activeIndex].height
+        });
+      }
+
+    }
+  });
 
   var dragObj = draggable.drag();
 
@@ -84,7 +83,7 @@ var draggables = [].map.call(items, function(elem, index, arr) {
 
   dragObj
     .on('move', function(e) {
-      coordinator(e.x, e.y);
+      vent.emit('move', index, e.y);
     })
     .on('start', function() {
       activeIndex = index;

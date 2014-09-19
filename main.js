@@ -45,7 +45,8 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var Impulse = __webpack_require__(2);
-	var _ = __webpack_require__(1);
+	var _ = __webpack_require__(3);
+	var EventEmitter = __webpack_require__(1).EventEmitter;
 
 	var move = function(impulseElem, offset) {
 	  impulseElem.spring({ tension: 100, damping: 10 })
@@ -59,67 +60,68 @@
 	  });
 	};
 
-	// take current x, y and figure out where to move surrounding elems
-	var coordinator = function(x, y) {
-	  var itemIndex = _.findIndex(rects, function(item) {
-	    return y > item.top && y < item.bottom;
-	  });
-	  if (itemIndex >= 0 && itemIndex !== activeIndex) {
-	    var newOffset;
-
-	    // element moving downwards
-	    if (itemIndex > activeIndex) {
-	      // bottom half of element
-	      if (y > rects[itemIndex].top + rects[itemIndex].height/2) {
-	        // move up
-	        move(draggables[itemIndex], -rects[itemIndex].height);
-
-	        newOffset = rects.slice(activeIndex, itemIndex).reduce(function(prev, curr) {
-	          return prev + curr.height;
-	        }, 0);
-	        springAtEnd(drags[activeIndex], draggables[activeIndex], newOffset);
-	      } else {
-	        // return to origin
-	        move(draggables[itemIndex], 0);
-	      }
-
-	    // element is moving upwards
-	    } else {
-
-	      // top half of element
-	      if (y < rects[itemIndex].top + rects[itemIndex].height/2) {
-	        // move down
-	        move(draggables[itemIndex], rects[itemIndex].height);
-
-	        newOffset = -rects.slice(0, activeIndex).reduce(function(prev, curr) {
-	          return prev + curr.height;
-	        }, 0);
-	        springAtEnd(drags[activeIndex], draggables[activeIndex], newOffset);
-	      } else {
-	        // return to origin
-	        move(draggables[itemIndex], 0);
-	      }
-	    }
-	  }
-	};
+	var vent = new EventEmitter();
 
 	var activeIndex;
 
 	var items = document.getElementsByClassName('list-item');
 
-	var rects = [];
-
 	var drags = [];
 
-	var draggables = [].map.call(items, function(elem, index, arr) {
-	  var height = elem.offsetHeight;
+	var rects = [];
 
-	  rects.push(elem.getBoundingClientRect());
+	var draggables = [].map.call(items, function(elem, index, arr) {
+	  var height = elem.offsetHeight,
+	    origRect = elem.getBoundingClientRect(),
+	    rect = _.pick(origRect, ['height', 'width', 'left', 'bottom', 'right', 'top']);
+
+	  rects.push(rect);
 
 	  var draggable = Impulse(elem)
 	    .style('translate', function(x, y) {
 	      return x + 'px, ' + y + 'px';
 	    });
+
+	  // index of the thing that's moving and y coordinate
+	  vent.on('move', function(indexOfMover, y) {
+	    if (indexOfMover === index) {
+	      return;
+	    }
+
+	    if (y > (rect.top + rect.height/2)) {
+
+	      if (indexOfMover < index) {
+	        move(draggable, -rects[activeIndex].height);
+	        rect = _.extend(rect, {
+	          top: origRect.top - rects[activeIndex].height,
+	          bottom: origRect.bottom - rects[activeIndex].height
+	        });
+	      } else {
+	        move(draggable, 0);
+	        rect = _.extend(rect, {
+	          top: origRect.top + rects[activeIndex].height,
+	          bottom: origRect.bottom + rects[activeIndex].height
+	        });
+	      }
+
+	    } else if (y < (rect.top + rect.height/2)) {
+
+	      if (indexOfMover < index) {
+	        move(draggable, 0);
+	        rect = _.extend(rect, {
+	          top: origRect.top - rects[activeIndex].height,
+	          bottom: origRect.bottom - rects[activeIndex].height
+	        });
+	      } else {
+	        move(draggable, rects[activeIndex].height);
+	        rect = _.extend(rect, {
+	          top: origRect.top + rects[activeIndex].height,
+	          bottom: origRect.bottom + rects[activeIndex].height
+	        });
+	      }
+
+	    }
+	  });
 
 	  var dragObj = draggable.drag();
 
@@ -127,7 +129,7 @@
 
 	  dragObj
 	    .on('move', function(e) {
-	      coordinator(e.x, e.y);
+	      vent.emit('move', index, e.y);
 	    })
 	    .on('start', function() {
 	      activeIndex = index;
@@ -142,6 +144,433 @@
 
 /***/ },
 /* 1 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// Copyright Joyent, Inc. and other Node contributors.
+	//
+	// Permission is hereby granted, free of charge, to any person obtaining a
+	// copy of this software and associated documentation files (the
+	// "Software"), to deal in the Software without restriction, including
+	// without limitation the rights to use, copy, modify, merge, publish,
+	// distribute, sublicense, and/or sell copies of the Software, and to permit
+	// persons to whom the Software is furnished to do so, subject to the
+	// following conditions:
+	//
+	// The above copyright notice and this permission notice shall be included
+	// in all copies or substantial portions of the Software.
+	//
+	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+	// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+	function EventEmitter() {
+	  this._events = this._events || {};
+	  this._maxListeners = this._maxListeners || undefined;
+	}
+	module.exports = EventEmitter;
+
+	// Backwards-compat with node 0.10.x
+	EventEmitter.EventEmitter = EventEmitter;
+
+	EventEmitter.prototype._events = undefined;
+	EventEmitter.prototype._maxListeners = undefined;
+
+	// By default EventEmitters will print a warning if more than 10 listeners are
+	// added to it. This is a useful default which helps finding memory leaks.
+	EventEmitter.defaultMaxListeners = 10;
+
+	// Obviously not all Emitters should be limited to 10. This function allows
+	// that to be increased. Set to zero for unlimited.
+	EventEmitter.prototype.setMaxListeners = function(n) {
+	  if (!isNumber(n) || n < 0 || isNaN(n))
+	    throw TypeError('n must be a positive number');
+	  this._maxListeners = n;
+	  return this;
+	};
+
+	EventEmitter.prototype.emit = function(type) {
+	  var er, handler, len, args, i, listeners;
+
+	  if (!this._events)
+	    this._events = {};
+
+	  // If there is no 'error' event listener then throw.
+	  if (type === 'error') {
+	    if (!this._events.error ||
+	        (isObject(this._events.error) && !this._events.error.length)) {
+	      er = arguments[1];
+	      if (er instanceof Error) {
+	        throw er; // Unhandled 'error' event
+	      } else {
+	        throw TypeError('Uncaught, unspecified "error" event.');
+	      }
+	      return false;
+	    }
+	  }
+
+	  handler = this._events[type];
+
+	  if (isUndefined(handler))
+	    return false;
+
+	  if (isFunction(handler)) {
+	    switch (arguments.length) {
+	      // fast cases
+	      case 1:
+	        handler.call(this);
+	        break;
+	      case 2:
+	        handler.call(this, arguments[1]);
+	        break;
+	      case 3:
+	        handler.call(this, arguments[1], arguments[2]);
+	        break;
+	      // slower
+	      default:
+	        len = arguments.length;
+	        args = new Array(len - 1);
+	        for (i = 1; i < len; i++)
+	          args[i - 1] = arguments[i];
+	        handler.apply(this, args);
+	    }
+	  } else if (isObject(handler)) {
+	    len = arguments.length;
+	    args = new Array(len - 1);
+	    for (i = 1; i < len; i++)
+	      args[i - 1] = arguments[i];
+
+	    listeners = handler.slice();
+	    len = listeners.length;
+	    for (i = 0; i < len; i++)
+	      listeners[i].apply(this, args);
+	  }
+
+	  return true;
+	};
+
+	EventEmitter.prototype.addListener = function(type, listener) {
+	  var m;
+
+	  if (!isFunction(listener))
+	    throw TypeError('listener must be a function');
+
+	  if (!this._events)
+	    this._events = {};
+
+	  // To avoid recursion in the case that type === "newListener"! Before
+	  // adding it to the listeners, first emit "newListener".
+	  if (this._events.newListener)
+	    this.emit('newListener', type,
+	              isFunction(listener.listener) ?
+	              listener.listener : listener);
+
+	  if (!this._events[type])
+	    // Optimize the case of one listener. Don't need the extra array object.
+	    this._events[type] = listener;
+	  else if (isObject(this._events[type]))
+	    // If we've already got an array, just append.
+	    this._events[type].push(listener);
+	  else
+	    // Adding the second element, need to change to array.
+	    this._events[type] = [this._events[type], listener];
+
+	  // Check for listener leak
+	  if (isObject(this._events[type]) && !this._events[type].warned) {
+	    var m;
+	    if (!isUndefined(this._maxListeners)) {
+	      m = this._maxListeners;
+	    } else {
+	      m = EventEmitter.defaultMaxListeners;
+	    }
+
+	    if (m && m > 0 && this._events[type].length > m) {
+	      this._events[type].warned = true;
+	      console.error('(node) warning: possible EventEmitter memory ' +
+	                    'leak detected. %d listeners added. ' +
+	                    'Use emitter.setMaxListeners() to increase limit.',
+	                    this._events[type].length);
+	      if (typeof console.trace === 'function') {
+	        // not supported in IE 10
+	        console.trace();
+	      }
+	    }
+	  }
+
+	  return this;
+	};
+
+	EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+	EventEmitter.prototype.once = function(type, listener) {
+	  if (!isFunction(listener))
+	    throw TypeError('listener must be a function');
+
+	  var fired = false;
+
+	  function g() {
+	    this.removeListener(type, g);
+
+	    if (!fired) {
+	      fired = true;
+	      listener.apply(this, arguments);
+	    }
+	  }
+
+	  g.listener = listener;
+	  this.on(type, g);
+
+	  return this;
+	};
+
+	// emits a 'removeListener' event iff the listener was removed
+	EventEmitter.prototype.removeListener = function(type, listener) {
+	  var list, position, length, i;
+
+	  if (!isFunction(listener))
+	    throw TypeError('listener must be a function');
+
+	  if (!this._events || !this._events[type])
+	    return this;
+
+	  list = this._events[type];
+	  length = list.length;
+	  position = -1;
+
+	  if (list === listener ||
+	      (isFunction(list.listener) && list.listener === listener)) {
+	    delete this._events[type];
+	    if (this._events.removeListener)
+	      this.emit('removeListener', type, listener);
+
+	  } else if (isObject(list)) {
+	    for (i = length; i-- > 0;) {
+	      if (list[i] === listener ||
+	          (list[i].listener && list[i].listener === listener)) {
+	        position = i;
+	        break;
+	      }
+	    }
+
+	    if (position < 0)
+	      return this;
+
+	    if (list.length === 1) {
+	      list.length = 0;
+	      delete this._events[type];
+	    } else {
+	      list.splice(position, 1);
+	    }
+
+	    if (this._events.removeListener)
+	      this.emit('removeListener', type, listener);
+	  }
+
+	  return this;
+	};
+
+	EventEmitter.prototype.removeAllListeners = function(type) {
+	  var key, listeners;
+
+	  if (!this._events)
+	    return this;
+
+	  // not listening for removeListener, no need to emit
+	  if (!this._events.removeListener) {
+	    if (arguments.length === 0)
+	      this._events = {};
+	    else if (this._events[type])
+	      delete this._events[type];
+	    return this;
+	  }
+
+	  // emit removeListener for all listeners on all events
+	  if (arguments.length === 0) {
+	    for (key in this._events) {
+	      if (key === 'removeListener') continue;
+	      this.removeAllListeners(key);
+	    }
+	    this.removeAllListeners('removeListener');
+	    this._events = {};
+	    return this;
+	  }
+
+	  listeners = this._events[type];
+
+	  if (isFunction(listeners)) {
+	    this.removeListener(type, listeners);
+	  } else {
+	    // LIFO order
+	    while (listeners.length)
+	      this.removeListener(type, listeners[listeners.length - 1]);
+	  }
+	  delete this._events[type];
+
+	  return this;
+	};
+
+	EventEmitter.prototype.listeners = function(type) {
+	  var ret;
+	  if (!this._events || !this._events[type])
+	    ret = [];
+	  else if (isFunction(this._events[type]))
+	    ret = [this._events[type]];
+	  else
+	    ret = this._events[type].slice();
+	  return ret;
+	};
+
+	EventEmitter.listenerCount = function(emitter, type) {
+	  var ret;
+	  if (!emitter._events || !emitter._events[type])
+	    ret = 0;
+	  else if (isFunction(emitter._events[type]))
+	    ret = 1;
+	  else
+	    ret = emitter._events[type].length;
+	  return ret;
+	};
+
+	function isFunction(arg) {
+	  return typeof arg === 'function';
+	}
+
+	function isNumber(arg) {
+	  return typeof arg === 'number';
+	}
+
+	function isObject(arg) {
+	  return typeof arg === 'object' && arg !== null;
+	}
+
+	function isUndefined(arg) {
+	  return arg === void 0;
+	}
+
+
+/***/ },
+/* 2 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var simulation = __webpack_require__(4)
+	var Vector = __webpack_require__(5)
+	var Renderer = __webpack_require__(6)
+	var defaults = __webpack_require__(17)
+	var Spring = __webpack_require__(7)
+	var AttachSpring = __webpack_require__(8)
+	var Decelerate = __webpack_require__(9)
+	var Accelerate = __webpack_require__(10)
+	var Drag = __webpack_require__(11)
+	var Interact = __webpack_require__(12)
+	var Boundry = __webpack_require__(13)
+	var Promise = window.Promise || __webpack_require__(18)
+
+	module.exports = Physics
+
+	function Physics(rendererOrEls) {
+	  if(!(this instanceof Physics)) {
+	    return new Physics(rendererOrEls)
+	  }
+	  if(typeof rendererOrEls === 'function') {
+	    this._render = rendererOrEls
+	    this.els = []
+	  } else {
+	    if(rendererOrEls.length)
+	      this.els = [].slice.call(rendererOrEls)
+	    else
+	      this.els = [rendererOrEls]
+
+	    this._renderer = new Renderer(this.els)
+	    this._render = this._renderer.update.bind(this._renderer)
+	  }
+
+	  this._position = Vector(0, 0)
+	  this._velocity = Vector(0, 0)
+	}
+
+	Physics.Boundry = Boundry
+	Physics.Vector = Vector
+	Physics.Promise = Promise
+
+	Physics.prototype.style = function() {
+	  this._renderer.style.apply(this._renderer, arguments)
+	  return this
+	}
+
+	Physics.prototype.visible = function() {
+	  this._renderer.visible.apply(this._renderer, arguments)
+	  return this
+	}
+
+	Physics.prototype.direction = function(d) {
+	  var velocity = this.velocity()
+	    , h, v, c
+
+	  if(velocity.x < 0)      h = 'left'
+	  else if(velocity.x > 0) h = 'right'
+
+	  if(velocity.y < 0)      v = 'up'
+	  else if(velocity.y > 0) v = 'down'
+
+	  var c = h + (v || '').toUpperCase()
+
+	  return d === h || d === v || d === c
+	}
+
+	Physics.prototype.atRest = function() {
+	  var velocity = this.velocity()
+	  return velocity.x === 0 && velocity.y === 0
+	}
+
+	Physics.prototype._startAnimation = function(animation) {
+	  if(this._currentAnimation && this._currentAnimation.running()) {
+	    this._currentAnimation.cancel()
+	  }
+	  this._currentAnimation = animation
+	}
+
+	Physics.prototype.velocity = function(x, y) {
+	  if(!arguments.length) return this._velocity
+	  this._velocity = Vector(x, y)
+	  return this
+	}
+
+	Physics.prototype.position = function(x, y) {
+	  if(!arguments.length) return this._position.clone()
+	  this._position = Vector(x, y)
+	  this._render(this._position.x, this._position.y)
+	  return this
+	}
+
+	Physics.prototype.interact = function(opts) {
+	  return new Interact(this, opts)
+	}
+
+	Physics.prototype.drag = function(opts, start) {
+	  return new Drag(this, opts, start)
+	}
+
+	Physics.prototype.spring = function(opts) {
+	  return new Spring(this, opts)
+	}
+
+	Physics.prototype.decelerate = function(opts) {
+	  return new Decelerate(this, opts)
+	}
+
+	Physics.prototype.accelerate = function(opts) {
+	  return new Accelerate(this, opts)
+	}
+
+	Physics.prototype.attachSpring = function(attachment, opts) {
+	  return new AttachSpring(this, attachment, opts)
+	}
+
+/***/ },
+/* 3 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_RESULT__;/* WEBPACK VAR INJECTION */(function(module, global) {/**
@@ -7302,133 +7731,15 @@
 	  }
 	}.call(this));
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(18)(module), (function() { return this; }())))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(19)(module), (function() { return this; }())))
 
 /***/ },
-/* 2 */
+/* 4 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var simulation = __webpack_require__(3)
-	var Vector = __webpack_require__(4)
-	var Renderer = __webpack_require__(5)
-	var defaults = __webpack_require__(13)
-	var Spring = __webpack_require__(6)
-	var AttachSpring = __webpack_require__(7)
-	var Decelerate = __webpack_require__(8)
-	var Accelerate = __webpack_require__(9)
-	var Drag = __webpack_require__(10)
-	var Interact = __webpack_require__(11)
-	var Boundry = __webpack_require__(12)
-	var Promise = window.Promise || __webpack_require__(14)
-
-	module.exports = Physics
-
-	function Physics(rendererOrEls) {
-	  if(!(this instanceof Physics)) {
-	    return new Physics(rendererOrEls)
-	  }
-	  if(typeof rendererOrEls === 'function') {
-	    this._render = rendererOrEls
-	    this.els = []
-	  } else {
-	    if(rendererOrEls.length)
-	      this.els = [].slice.call(rendererOrEls)
-	    else
-	      this.els = [rendererOrEls]
-
-	    this._renderer = new Renderer(this.els)
-	    this._render = this._renderer.update.bind(this._renderer)
-	  }
-
-	  this._position = Vector(0, 0)
-	  this._velocity = Vector(0, 0)
-	}
-
-	Physics.Boundry = Boundry
-	Physics.Vector = Vector
-	Physics.Promise = Promise
-
-	Physics.prototype.style = function() {
-	  this._renderer.style.apply(this._renderer, arguments)
-	  return this
-	}
-
-	Physics.prototype.visible = function() {
-	  this._renderer.visible.apply(this._renderer, arguments)
-	  return this
-	}
-
-	Physics.prototype.direction = function(d) {
-	  var velocity = this.velocity()
-	    , h, v, c
-
-	  if(velocity.x < 0)      h = 'left'
-	  else if(velocity.x > 0) h = 'right'
-
-	  if(velocity.y < 0)      v = 'up'
-	  else if(velocity.y > 0) v = 'down'
-
-	  var c = h + (v || '').toUpperCase()
-
-	  return d === h || d === v || d === c
-	}
-
-	Physics.prototype.atRest = function() {
-	  var velocity = this.velocity()
-	  return velocity.x === 0 && velocity.y === 0
-	}
-
-	Physics.prototype._startAnimation = function(animation) {
-	  if(this._currentAnimation && this._currentAnimation.running()) {
-	    this._currentAnimation.cancel()
-	  }
-	  this._currentAnimation = animation
-	}
-
-	Physics.prototype.velocity = function(x, y) {
-	  if(!arguments.length) return this._velocity
-	  this._velocity = Vector(x, y)
-	  return this
-	}
-
-	Physics.prototype.position = function(x, y) {
-	  if(!arguments.length) return this._position.clone()
-	  this._position = Vector(x, y)
-	  this._render(this._position.x, this._position.y)
-	  return this
-	}
-
-	Physics.prototype.interact = function(opts) {
-	  return new Interact(this, opts)
-	}
-
-	Physics.prototype.drag = function(opts, start) {
-	  return new Drag(this, opts, start)
-	}
-
-	Physics.prototype.spring = function(opts) {
-	  return new Spring(this, opts)
-	}
-
-	Physics.prototype.decelerate = function(opts) {
-	  return new Decelerate(this, opts)
-	}
-
-	Physics.prototype.accelerate = function(opts) {
-	  return new Accelerate(this, opts)
-	}
-
-	Physics.prototype.attachSpring = function(attachment, opts) {
-	  return new AttachSpring(this, attachment, opts)
-	}
-
-/***/ },
-/* 3 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var Vector = __webpack_require__(4)
+	var Vector = __webpack_require__(5)
 	  , bodies = []
-	  , raf = __webpack_require__(19)
+	  , raf = __webpack_require__(20)
 
 	function increment(a, b, c, d) {
 	  var vec = Vector(0, 0)
@@ -7518,7 +7829,7 @@
 
 
 /***/ },
-/* 4 */
+/* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = Vector
@@ -7671,13 +7982,13 @@
 
 
 /***/ },
-/* 5 */
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var prefixes = ['Webkit', 'Moz', 'Ms', 'ms']
 	var calls = []
 	var transformProp = prefixed('transform')
-	var raf = __webpack_require__(19)
+	var raf = __webpack_require__(20)
 
 	function loop() {
 	  raf(function() {
@@ -7776,13 +8087,13 @@
 
 
 /***/ },
-/* 6 */
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(15)
-	var simulation = __webpack_require__(3)
-	var Boundry = __webpack_require__(12)
-	var Animation = __webpack_require__(16)
+	var Body = __webpack_require__(14)
+	var simulation = __webpack_require__(4)
+	var Boundry = __webpack_require__(13)
+	var Animation = __webpack_require__(15)
 
 	var Spring = module.exports = Animation({
 	  defaultOptions: {
@@ -7813,13 +8124,13 @@
 
 
 /***/ },
-/* 7 */
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var defaults = __webpack_require__(13)
-	  , Vector = __webpack_require__(4)
-	  , simulation = __webpack_require__(3)
-	  , Body = __webpack_require__(15)
+	var defaults = __webpack_require__(17)
+	  , Vector = __webpack_require__(5)
+	  , simulation = __webpack_require__(4)
+	  , Body = __webpack_require__(14)
 
 	var defaultOptions = {
 	  tension: 100,
@@ -7918,13 +8229,13 @@
 	}
 
 /***/ },
-/* 8 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(15)
-	var simulation = __webpack_require__(3)
-	var Boundry = __webpack_require__(12)
-	var Animation = __webpack_require__(16)
+	var Body = __webpack_require__(14)
+	var simulation = __webpack_require__(4)
+	var Boundry = __webpack_require__(13)
+	var Animation = __webpack_require__(15)
 
 	var Decelerate = module.exports = Animation({
 	  defaultOptions: {
@@ -7966,15 +8277,15 @@
 
 
 /***/ },
-/* 9 */
+/* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(15)
-	var simulation = __webpack_require__(3)
-	var Boundry = __webpack_require__(12)
-	var Animation = __webpack_require__(16)
-	var Vector = __webpack_require__(4)
-	var height = __webpack_require__(17).height
+	var Body = __webpack_require__(14)
+	var simulation = __webpack_require__(4)
+	var Boundry = __webpack_require__(13)
+	var Animation = __webpack_require__(15)
+	var Vector = __webpack_require__(5)
+	var height = __webpack_require__(16).height
 
 	var Accelerate = module.exports = Animation({
 	  defaultOptions: {
@@ -8035,11 +8346,11 @@
 
 
 /***/ },
-/* 10 */
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Emitter = __webpack_require__(20)
-	  , defaults = __webpack_require__(13)
+	var Emitter = __webpack_require__(22)
+	  , defaults = __webpack_require__(17)
 
 	var defaultOpts = {}
 
@@ -8126,15 +8437,15 @@
 
 
 /***/ },
-/* 11 */
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var defaults = __webpack_require__(13)
+	var defaults = __webpack_require__(17)
 	var Velocity = __webpack_require__(21)
-	var Vector = __webpack_require__(4)
-	var Promise = __webpack_require__(14)
-	var util = __webpack_require__(17)
-	var Boundry = __webpack_require__(12)
+	var Vector = __webpack_require__(5)
+	var Promise = __webpack_require__(18)
+	var util = __webpack_require__(16)
+	var Boundry = __webpack_require__(13)
 
 	module.exports = Interact
 
@@ -8221,10 +8532,10 @@
 
 
 /***/ },
-/* 12 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Vector = __webpack_require__(4)
+	var Vector = __webpack_require__(5)
 	module.exports = Boundry
 
 	function pointBetween(p, p1, p2) {
@@ -8309,7 +8620,178 @@
 	}
 
 /***/ },
-/* 13 */
+/* 14 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var Vector = __webpack_require__(5)
+
+	module.exports = Body
+
+	function Body(vel, from, fns) {
+	  if(!(this instanceof Body)) return new Body(vel, from, fns)
+
+	  this.previousPosition = this.position = Vector(from)
+	  this.velocity = Vector(vel)
+	  this._fns = fns
+	}
+
+	Body.prototype.update = function(alpha) {
+	  var pos = this.previousPosition.clone().lerp(this.position, alpha)
+	  this._fns.update(pos, this.velocity)
+	}
+
+	Body.prototype.accelerate = function(state, t) {
+	  return this._fns.accelerate(state, t)
+	}
+
+	Body.prototype.atRest = function() {
+	  return this.velocity.norm() < .01
+	}
+
+	Body.prototype.atPosition = function(pos) {
+	  //return whether the distance between this.position and pos is less than .1
+	  return this.position.sub(Vector(pos)).norm() < .01
+	}
+
+
+/***/ },
+/* 15 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var defaults = __webpack_require__(17)
+	  , Promise = window.Promise || __webpack_require__(18)
+	  , Boundry = __webpack_require__(13)
+	  , Vector = __webpack_require__(5)
+	  , Emitter = __webpack_require__(22)
+
+	var proto = {
+	  to: function(x, y) {
+	    if(x instanceof Boundry)
+	      this._to = x
+	    else
+	      this._to = Vector(x, y)
+	    return this
+	  },
+
+	  velocity: function(x, y) {
+	    this._velocity = Vector(x, y)
+	    return this
+	  },
+
+	  from: function(x, y) {
+	    this._from = Vector(x, y)
+	    return this
+	  },
+
+	  _updateState: function(position, velocity) {
+	    this._phys.position(position)
+	    this._phys.velocity(velocity)
+	  },
+
+	  cancel: function() {
+	    this._onEnd()
+	    this._running = false
+	    this._reject()
+	  },
+
+	  running: function() {
+	    return this._running || false
+	  },
+
+	  start: function() {
+	    var that = this
+	      , from = (this._from) ? this._from : this._phys.position()
+	      , to = (this._to) ? this._to : this._phys.position()
+	      , velocity = (this._velocity) ? this._velocity : this._phys.velocity()
+	      , opts = defaults({}, this._opts || {}, this._defaultOpts)
+
+	    var update = {
+	      state: function(position, velocity) {
+	        that._updateState(position, velocity)
+	      },
+	      done: function(position, velocity) {
+	        that._updateState(position, velocity)
+	        that._onEnd()
+	        that._running = false
+	        that._resolve({ position: position, velocity: velocity })
+	      },
+	      cancel: function(position, velocity) {
+	        that._updateState(position, velocity)
+	        that._onEnd()
+	        that._running = false
+	        that._reject()
+	      }
+	    }
+	    this._phys._startAnimation(this)
+
+	    this._running = true
+	    if(to instanceof Boundry)
+	      to = to.nearestIntersect(from, velocity)
+	    this._onStart(velocity, from, to, opts, update)
+
+	    return that._ended
+	  }
+	}
+
+	function Animation(callbacks) {
+	  var animation = function(phys, opts) {
+	    var that = this
+	    this._opts = opts
+	    this._phys = phys
+	    this._onStart = callbacks.onStart
+	    this._onEnd = callbacks.onEnd
+	    this._defaultOpts = callbacks.defaultOptions
+
+	    this._ended = new Promise(function(resolve, reject) {
+	      that._resolve = resolve
+	      that._reject = reject
+	    })
+
+	    this.start = this.start.bind(this)
+	  }
+
+	  Emitter(animation.prototype)
+	  animation.prototype = proto
+
+	  return animation
+	}
+
+
+
+
+
+	module.exports = Animation
+
+
+/***/ },
+/* 16 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var Vector = __webpack_require__(5)
+	function vertex(a, b) {
+	  return -b / (2 * a)
+	}
+
+	function height(a, b, c) {
+	  return parabola(a, b, c, vertex(a, b))
+	}
+
+	function parabola(a, b, c, x) {
+	  return a * x * x + b * x + c
+	}
+
+	function eventVector(evt) {
+	  return Vector({
+	    x: evt.touches && evt.touches[0].pageX || evt.pageX,
+	    y: evt.touches && evt.touches[0].pageY || evt.pageY
+	  })
+	}
+
+	module.exports.height = height
+	module.exports.eventVector = eventVector
+
+/***/ },
+/* 17 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -8320,8 +8802,8 @@
 	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <http://lodash.com/license>
 	 */
-	var keys = __webpack_require__(23),
-	    objectTypes = __webpack_require__(24);
+	var keys = __webpack_require__(24),
+	    objectTypes = __webpack_require__(25);
 
 	/**
 	 * Assigns own enumerable properties of source object(s) to the destination
@@ -8369,15 +8851,15 @@
 
 
 /***/ },
-/* 14 */
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	//This file contains then/promise specific extensions to the core promise API
 
-	var Promise = __webpack_require__(22)
-	var asap = __webpack_require__(25)
+	var Promise = __webpack_require__(23)
+	var asap = __webpack_require__(26)
 
 	module.exports = Promise
 
@@ -8555,178 +9037,7 @@
 
 
 /***/ },
-/* 15 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var Vector = __webpack_require__(4)
-
-	module.exports = Body
-
-	function Body(vel, from, fns) {
-	  if(!(this instanceof Body)) return new Body(vel, from, fns)
-
-	  this.previousPosition = this.position = Vector(from)
-	  this.velocity = Vector(vel)
-	  this._fns = fns
-	}
-
-	Body.prototype.update = function(alpha) {
-	  var pos = this.previousPosition.clone().lerp(this.position, alpha)
-	  this._fns.update(pos, this.velocity)
-	}
-
-	Body.prototype.accelerate = function(state, t) {
-	  return this._fns.accelerate(state, t)
-	}
-
-	Body.prototype.atRest = function() {
-	  return this.velocity.norm() < .01
-	}
-
-	Body.prototype.atPosition = function(pos) {
-	  //return whether the distance between this.position and pos is less than .1
-	  return this.position.sub(Vector(pos)).norm() < .01
-	}
-
-
-/***/ },
-/* 16 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var defaults = __webpack_require__(13)
-	  , Promise = window.Promise || __webpack_require__(14)
-	  , Boundry = __webpack_require__(12)
-	  , Vector = __webpack_require__(4)
-	  , Emitter = __webpack_require__(20)
-
-	var proto = {
-	  to: function(x, y) {
-	    if(x instanceof Boundry)
-	      this._to = x
-	    else
-	      this._to = Vector(x, y)
-	    return this
-	  },
-
-	  velocity: function(x, y) {
-	    this._velocity = Vector(x, y)
-	    return this
-	  },
-
-	  from: function(x, y) {
-	    this._from = Vector(x, y)
-	    return this
-	  },
-
-	  _updateState: function(position, velocity) {
-	    this._phys.position(position)
-	    this._phys.velocity(velocity)
-	  },
-
-	  cancel: function() {
-	    this._onEnd()
-	    this._running = false
-	    this._reject()
-	  },
-
-	  running: function() {
-	    return this._running || false
-	  },
-
-	  start: function() {
-	    var that = this
-	      , from = (this._from) ? this._from : this._phys.position()
-	      , to = (this._to) ? this._to : this._phys.position()
-	      , velocity = (this._velocity) ? this._velocity : this._phys.velocity()
-	      , opts = defaults({}, this._opts || {}, this._defaultOpts)
-
-	    var update = {
-	      state: function(position, velocity) {
-	        that._updateState(position, velocity)
-	      },
-	      done: function(position, velocity) {
-	        that._updateState(position, velocity)
-	        that._onEnd()
-	        that._running = false
-	        that._resolve({ position: position, velocity: velocity })
-	      },
-	      cancel: function(position, velocity) {
-	        that._updateState(position, velocity)
-	        that._onEnd()
-	        that._running = false
-	        that._reject()
-	      }
-	    }
-	    this._phys._startAnimation(this)
-
-	    this._running = true
-	    if(to instanceof Boundry)
-	      to = to.nearestIntersect(from, velocity)
-	    this._onStart(velocity, from, to, opts, update)
-
-	    return that._ended
-	  }
-	}
-
-	function Animation(callbacks) {
-	  var animation = function(phys, opts) {
-	    var that = this
-	    this._opts = opts
-	    this._phys = phys
-	    this._onStart = callbacks.onStart
-	    this._onEnd = callbacks.onEnd
-	    this._defaultOpts = callbacks.defaultOptions
-
-	    this._ended = new Promise(function(resolve, reject) {
-	      that._resolve = resolve
-	      that._reject = reject
-	    })
-
-	    this.start = this.start.bind(this)
-	  }
-
-	  Emitter(animation.prototype)
-	  animation.prototype = proto
-
-	  return animation
-	}
-
-
-
-
-
-	module.exports = Animation
-
-
-/***/ },
-/* 17 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var Vector = __webpack_require__(4)
-	function vertex(a, b) {
-	  return -b / (2 * a)
-	}
-
-	function height(a, b, c) {
-	  return parabola(a, b, c, vertex(a, b))
-	}
-
-	function parabola(a, b, c, x) {
-	  return a * x * x + b * x + c
-	}
-
-	function eventVector(evt) {
-	  return Vector({
-	    x: evt.touches && evt.touches[0].pageX || evt.pageX,
-	    y: evt.touches && evt.touches[0].pageY || evt.pageY
-	  })
-	}
-
-	module.exports.height = height
-	module.exports.eventVector = eventVector
-
-/***/ },
-/* 18 */
+/* 19 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = function(module) {
@@ -8742,10 +9053,10 @@
 
 
 /***/ },
-/* 19 */
+/* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var now = __webpack_require__(26)
+	var now = __webpack_require__(27)
 	  , global = typeof window === 'undefined' ? {} : window
 	  , vendors = ['moz', 'webkit']
 	  , suffix = 'AnimationFrame'
@@ -8828,7 +9139,49 @@
 
 
 /***/ },
-/* 20 */
+/* 21 */
+/***/ function(module, exports, __webpack_require__) {
+
+	module.exports = Velocity
+
+	function Velocity() {
+	  this.positionQueue = []
+	  this.timeQueue = []
+	}
+
+	Velocity.prototype.reset = function() {
+	  this.positionQueue.splice(0)
+	  this.timeQueue.splice(0)
+	}
+
+	Velocity.prototype.pruneQueue = function(ms) {
+	  //pull old values off of the queue
+	  while(this.timeQueue.length && this.timeQueue[0] < (Date.now() - ms)) {
+	    this.timeQueue.shift()
+	    this.positionQueue.shift()
+	  }
+	}
+
+	Velocity.prototype.updatePosition = function(position) {
+	  this.positionQueue.push(position)
+	  this.timeQueue.push(Date.now())
+	  this.pruneQueue(50)
+	}
+
+	Velocity.prototype.getVelocity = function() {
+	  this.pruneQueue(1000)
+	  var length = this.timeQueue.length
+	  if(length < 2) return 0
+
+	  var distance = this.positionQueue[length-1] - this.positionQueue[0]
+	    , time = (this.timeQueue[length-1] - this.timeQueue[0]) / 1000
+
+	  return distance / time
+	}
+
+
+/***/ },
+/* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
 	
@@ -8998,54 +9351,12 @@
 
 
 /***/ },
-/* 21 */
-/***/ function(module, exports, __webpack_require__) {
-
-	module.exports = Velocity
-
-	function Velocity() {
-	  this.positionQueue = []
-	  this.timeQueue = []
-	}
-
-	Velocity.prototype.reset = function() {
-	  this.positionQueue.splice(0)
-	  this.timeQueue.splice(0)
-	}
-
-	Velocity.prototype.pruneQueue = function(ms) {
-	  //pull old values off of the queue
-	  while(this.timeQueue.length && this.timeQueue[0] < (Date.now() - ms)) {
-	    this.timeQueue.shift()
-	    this.positionQueue.shift()
-	  }
-	}
-
-	Velocity.prototype.updatePosition = function(position) {
-	  this.positionQueue.push(position)
-	  this.timeQueue.push(Date.now())
-	  this.pruneQueue(50)
-	}
-
-	Velocity.prototype.getVelocity = function() {
-	  this.pruneQueue(1000)
-	  var length = this.timeQueue.length
-	  if(length < 2) return 0
-
-	  var distance = this.positionQueue[length-1] - this.positionQueue[0]
-	    , time = (this.timeQueue[length-1] - this.timeQueue[0]) / 1000
-
-	  return distance / time
-	}
-
-
-/***/ },
-/* 22 */
+/* 23 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var asap = __webpack_require__(25)
+	var asap = __webpack_require__(26)
 
 	module.exports = Promise
 	function Promise(fn) {
@@ -9151,7 +9462,7 @@
 
 
 /***/ },
-/* 23 */
+/* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -9163,8 +9474,8 @@
 	 * Available under MIT license <http://lodash.com/license>
 	 */
 	var isNative = __webpack_require__(28),
-	    isObject = __webpack_require__(27),
-	    shimKeys = __webpack_require__(29);
+	    isObject = __webpack_require__(31),
+	    shimKeys = __webpack_require__(30);
 
 	/* Native method shortcuts for methods with the same name as other `lodash` methods */
 	var nativeKeys = isNative(nativeKeys = Object.keys) && nativeKeys;
@@ -9193,7 +9504,7 @@
 
 
 /***/ },
-/* 24 */
+/* 25 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -9219,7 +9530,7 @@
 
 
 /***/ },
-/* 25 */
+/* 26 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {
@@ -9336,10 +9647,10 @@
 	module.exports = asap;
 
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(30)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(29)))
 
 /***/ },
-/* 26 */
+/* 27 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Generated by CoffeeScript 1.6.3
@@ -9379,52 +9690,7 @@
 	//@ sourceMappingURL=performance-now.map
 	*/
 	
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(30)))
-
-/***/ },
-/* 27 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
-	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
-	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
-	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
-	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-	 * Available under MIT license <http://lodash.com/license>
-	 */
-	var objectTypes = __webpack_require__(24);
-
-	/**
-	 * Checks if `value` is the language type of Object.
-	 * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
-	 *
-	 * @static
-	 * @memberOf _
-	 * @category Objects
-	 * @param {*} value The value to check.
-	 * @returns {boolean} Returns `true` if the `value` is an object, else `false`.
-	 * @example
-	 *
-	 * _.isObject({});
-	 * // => true
-	 *
-	 * _.isObject([1, 2, 3]);
-	 * // => true
-	 *
-	 * _.isObject(1);
-	 * // => false
-	 */
-	function isObject(value) {
-	  // check if the value is the ECMAScript language type of Object
-	  // http://es5.github.io/#x8
-	  // and avoid a V8 bug
-	  // http://code.google.com/p/v8/issues/detail?id=2291
-	  return !!(value && objectTypes[typeof value]);
-	}
-
-	module.exports = isObject;
-
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(29)))
 
 /***/ },
 /* 28 */
@@ -9468,50 +9734,6 @@
 
 /***/ },
 /* 29 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
-	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
-	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
-	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
-	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-	 * Available under MIT license <http://lodash.com/license>
-	 */
-	var objectTypes = __webpack_require__(24);
-
-	/** Used for native method references */
-	var objectProto = Object.prototype;
-
-	/** Native method shortcuts */
-	var hasOwnProperty = objectProto.hasOwnProperty;
-
-	/**
-	 * A fallback implementation of `Object.keys` which produces an array of the
-	 * given object's own enumerable property names.
-	 *
-	 * @private
-	 * @type Function
-	 * @param {Object} object The object to inspect.
-	 * @returns {Array} Returns an array of property names.
-	 */
-	var shimKeys = function(object) {
-	  var index, iterable = object, result = [];
-	  if (!iterable) return result;
-	  if (!(objectTypes[typeof object])) return result;
-	    for (index in iterable) {
-	      if (hasOwnProperty.call(iterable, index)) {
-	        result.push(index);
-	      }
-	    }
-	  return result
-	};
-
-	module.exports = shimKeys;
-
-
-/***/ },
-/* 30 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// shim for using process in browser
@@ -9577,6 +9799,95 @@
 	process.chdir = function (dir) {
 	    throw new Error('process.chdir is not supported');
 	};
+
+
+/***/ },
+/* 30 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
+	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+	 * Available under MIT license <http://lodash.com/license>
+	 */
+	var objectTypes = __webpack_require__(25);
+
+	/** Used for native method references */
+	var objectProto = Object.prototype;
+
+	/** Native method shortcuts */
+	var hasOwnProperty = objectProto.hasOwnProperty;
+
+	/**
+	 * A fallback implementation of `Object.keys` which produces an array of the
+	 * given object's own enumerable property names.
+	 *
+	 * @private
+	 * @type Function
+	 * @param {Object} object The object to inspect.
+	 * @returns {Array} Returns an array of property names.
+	 */
+	var shimKeys = function(object) {
+	  var index, iterable = object, result = [];
+	  if (!iterable) return result;
+	  if (!(objectTypes[typeof object])) return result;
+	    for (index in iterable) {
+	      if (hasOwnProperty.call(iterable, index)) {
+	        result.push(index);
+	      }
+	    }
+	  return result
+	};
+
+	module.exports = shimKeys;
+
+
+/***/ },
+/* 31 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
+	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+	 * Available under MIT license <http://lodash.com/license>
+	 */
+	var objectTypes = __webpack_require__(25);
+
+	/**
+	 * Checks if `value` is the language type of Object.
+	 * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+	 *
+	 * @static
+	 * @memberOf _
+	 * @category Objects
+	 * @param {*} value The value to check.
+	 * @returns {boolean} Returns `true` if the `value` is an object, else `false`.
+	 * @example
+	 *
+	 * _.isObject({});
+	 * // => true
+	 *
+	 * _.isObject([1, 2, 3]);
+	 * // => true
+	 *
+	 * _.isObject(1);
+	 * // => false
+	 */
+	function isObject(value) {
+	  // check if the value is the ECMAScript language type of Object
+	  // http://es5.github.io/#x8
+	  // and avoid a V8 bug
+	  // http://code.google.com/p/v8/issues/detail?id=2291
+	  return !!(value && objectTypes[typeof value]);
+	}
+
+	module.exports = isObject;
 
 
 /***/ }
