@@ -55,28 +55,14 @@ var draggables = [].map.call(items, function(elem, index, arr) {
   return draggable;
 });
 
-
-
 vent.on('move', function(indexOfMover, y) {
   // modify rects to represent where we want to go
 
-  var index;
-
-  if (y < rects[0].top) {
-    index = 0;
-  } else if (y > rects[rects.length - 1].bottom) {
-    index = rects.length - 1;
-  } else {
-    index = _.findIndex(rects, function(rect) {
-      return rect.top < y && rect.bottom > y;
-    });
-  }
+  var index = findInsertionIndex(y);
 
   if (index < 0) {
     return;
   }
-
-  // console.log(index);
 
   var mover = rects[indexOfMover];
   // deep clone
@@ -85,7 +71,6 @@ vent.on('move', function(indexOfMover, y) {
   newRects.splice(indexOfMover, 1);
   // insert the mover after the intersecting index
   newRects.splice(index, 0, mover);
-
 
   // re-calculate positions of all rects
 
@@ -107,8 +92,6 @@ vent.on('move', function(indexOfMover, y) {
     var origIndex = rect.id,
       offset = rect.top - rects[rect.id].top;
 
-    // console.log(origIndex, offset);
-
     // attach on end handler
     if (origIndex === activeIndex) {
       springAtEnd(drags[origIndex], draggables[origIndex], offset);
@@ -121,4 +104,16 @@ vent.on('move', function(indexOfMover, y) {
 
 
 });
+
+function findInsertionIndex(y) {
+  if (y < rects[0].top) {
+    return 0;
+  } else if (y > rects[rects.length - 1].bottom) {
+    return rects.length - 1;
+  } else {
+    return _.findIndex(rects, function(r) {
+      return r.top < y && r.bottom > y;
+    });
+  }
+}
 

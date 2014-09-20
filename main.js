@@ -101,28 +101,14 @@
 	  return draggable;
 	});
 
-
-
 	vent.on('move', function(indexOfMover, y) {
 	  // modify rects to represent where we want to go
 
-	  var index;
-
-	  if (y < rects[0].top) {
-	    index = 0;
-	  } else if (y > rects[rects.length - 1].bottom) {
-	    index = rects.length - 1;
-	  } else {
-	    index = _.findIndex(rects, function(rect) {
-	      return rect.top < y && rect.bottom > y;
-	    });
-	  }
+	  var index = findInsertionIndex(y);
 
 	  if (index < 0) {
 	    return;
 	  }
-
-	  // console.log(index);
 
 	  var mover = rects[indexOfMover];
 	  // deep clone
@@ -131,7 +117,6 @@
 	  newRects.splice(indexOfMover, 1);
 	  // insert the mover after the intersecting index
 	  newRects.splice(index, 0, mover);
-
 
 	  // re-calculate positions of all rects
 
@@ -153,8 +138,6 @@
 	    var origIndex = rect.id,
 	      offset = rect.top - rects[rect.id].top;
 
-	    // console.log(origIndex, offset);
-
 	    // attach on end handler
 	    if (origIndex === activeIndex) {
 	      springAtEnd(drags[origIndex], draggables[origIndex], offset);
@@ -167,6 +150,18 @@
 
 
 	});
+
+	function findInsertionIndex(y) {
+	  if (y < rects[0].top) {
+	    return 0;
+	  } else if (y > rects[rects.length - 1].bottom) {
+	    return rects.length - 1;
+	  } else {
+	    return _.findIndex(rects, function(r) {
+	      return r.top < y && r.bottom > y;
+	    });
+	  }
+	}
 
 
 
@@ -486,7 +481,7 @@
 	var simulation = __webpack_require__(4)
 	var Vector = __webpack_require__(5)
 	var Renderer = __webpack_require__(6)
-	var defaults = __webpack_require__(17)
+	var defaults = __webpack_require__(14)
 	var Spring = __webpack_require__(7)
 	var AttachSpring = __webpack_require__(8)
 	var Decelerate = __webpack_require__(9)
@@ -494,7 +489,7 @@
 	var Drag = __webpack_require__(11)
 	var Interact = __webpack_require__(12)
 	var Boundry = __webpack_require__(13)
-	var Promise = window.Promise || __webpack_require__(18)
+	var Promise = window.Promise || __webpack_require__(15)
 
 	module.exports = Physics
 
@@ -8118,10 +8113,10 @@
 /* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(14)
+	var Body = __webpack_require__(16)
 	var simulation = __webpack_require__(4)
 	var Boundry = __webpack_require__(13)
-	var Animation = __webpack_require__(15)
+	var Animation = __webpack_require__(17)
 
 	var Spring = module.exports = Animation({
 	  defaultOptions: {
@@ -8155,10 +8150,10 @@
 /* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var defaults = __webpack_require__(17)
+	var defaults = __webpack_require__(14)
 	  , Vector = __webpack_require__(5)
 	  , simulation = __webpack_require__(4)
-	  , Body = __webpack_require__(14)
+	  , Body = __webpack_require__(16)
 
 	var defaultOptions = {
 	  tension: 100,
@@ -8260,10 +8255,10 @@
 /* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(14)
+	var Body = __webpack_require__(16)
 	var simulation = __webpack_require__(4)
 	var Boundry = __webpack_require__(13)
-	var Animation = __webpack_require__(15)
+	var Animation = __webpack_require__(17)
 
 	var Decelerate = module.exports = Animation({
 	  defaultOptions: {
@@ -8308,12 +8303,12 @@
 /* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Body = __webpack_require__(14)
+	var Body = __webpack_require__(16)
 	var simulation = __webpack_require__(4)
 	var Boundry = __webpack_require__(13)
-	var Animation = __webpack_require__(15)
+	var Animation = __webpack_require__(17)
 	var Vector = __webpack_require__(5)
-	var height = __webpack_require__(16).height
+	var height = __webpack_require__(18).height
 
 	var Accelerate = module.exports = Animation({
 	  defaultOptions: {
@@ -8377,8 +8372,8 @@
 /* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Emitter = __webpack_require__(22)
-	  , defaults = __webpack_require__(17)
+	var Emitter = __webpack_require__(23)
+	  , defaults = __webpack_require__(14)
 
 	var defaultOpts = {}
 
@@ -8468,11 +8463,11 @@
 /* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var defaults = __webpack_require__(17)
-	var Velocity = __webpack_require__(21)
+	var defaults = __webpack_require__(14)
+	var Velocity = __webpack_require__(22)
 	var Vector = __webpack_require__(5)
-	var Promise = __webpack_require__(18)
-	var util = __webpack_require__(16)
+	var Promise = __webpack_require__(15)
+	var util = __webpack_require__(18)
 	var Boundry = __webpack_require__(13)
 
 	module.exports = Interact
@@ -8651,177 +8646,6 @@
 /* 14 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Vector = __webpack_require__(5)
-
-	module.exports = Body
-
-	function Body(vel, from, fns) {
-	  if(!(this instanceof Body)) return new Body(vel, from, fns)
-
-	  this.previousPosition = this.position = Vector(from)
-	  this.velocity = Vector(vel)
-	  this._fns = fns
-	}
-
-	Body.prototype.update = function(alpha) {
-	  var pos = this.previousPosition.clone().lerp(this.position, alpha)
-	  this._fns.update(pos, this.velocity)
-	}
-
-	Body.prototype.accelerate = function(state, t) {
-	  return this._fns.accelerate(state, t)
-	}
-
-	Body.prototype.atRest = function() {
-	  return this.velocity.norm() < .01
-	}
-
-	Body.prototype.atPosition = function(pos) {
-	  //return whether the distance between this.position and pos is less than .1
-	  return this.position.sub(Vector(pos)).norm() < .01
-	}
-
-
-/***/ },
-/* 15 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var defaults = __webpack_require__(17)
-	  , Promise = window.Promise || __webpack_require__(18)
-	  , Boundry = __webpack_require__(13)
-	  , Vector = __webpack_require__(5)
-	  , Emitter = __webpack_require__(22)
-
-	var proto = {
-	  to: function(x, y) {
-	    if(x instanceof Boundry)
-	      this._to = x
-	    else
-	      this._to = Vector(x, y)
-	    return this
-	  },
-
-	  velocity: function(x, y) {
-	    this._velocity = Vector(x, y)
-	    return this
-	  },
-
-	  from: function(x, y) {
-	    this._from = Vector(x, y)
-	    return this
-	  },
-
-	  _updateState: function(position, velocity) {
-	    this._phys.position(position)
-	    this._phys.velocity(velocity)
-	  },
-
-	  cancel: function() {
-	    this._onEnd()
-	    this._running = false
-	    this._reject()
-	  },
-
-	  running: function() {
-	    return this._running || false
-	  },
-
-	  start: function() {
-	    var that = this
-	      , from = (this._from) ? this._from : this._phys.position()
-	      , to = (this._to) ? this._to : this._phys.position()
-	      , velocity = (this._velocity) ? this._velocity : this._phys.velocity()
-	      , opts = defaults({}, this._opts || {}, this._defaultOpts)
-
-	    var update = {
-	      state: function(position, velocity) {
-	        that._updateState(position, velocity)
-	      },
-	      done: function(position, velocity) {
-	        that._updateState(position, velocity)
-	        that._onEnd()
-	        that._running = false
-	        that._resolve({ position: position, velocity: velocity })
-	      },
-	      cancel: function(position, velocity) {
-	        that._updateState(position, velocity)
-	        that._onEnd()
-	        that._running = false
-	        that._reject()
-	      }
-	    }
-	    this._phys._startAnimation(this)
-
-	    this._running = true
-	    if(to instanceof Boundry)
-	      to = to.nearestIntersect(from, velocity)
-	    this._onStart(velocity, from, to, opts, update)
-
-	    return that._ended
-	  }
-	}
-
-	function Animation(callbacks) {
-	  var animation = function(phys, opts) {
-	    var that = this
-	    this._opts = opts
-	    this._phys = phys
-	    this._onStart = callbacks.onStart
-	    this._onEnd = callbacks.onEnd
-	    this._defaultOpts = callbacks.defaultOptions
-
-	    this._ended = new Promise(function(resolve, reject) {
-	      that._resolve = resolve
-	      that._reject = reject
-	    })
-
-	    this.start = this.start.bind(this)
-	  }
-
-	  Emitter(animation.prototype)
-	  animation.prototype = proto
-
-	  return animation
-	}
-
-
-
-
-
-	module.exports = Animation
-
-
-/***/ },
-/* 16 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var Vector = __webpack_require__(5)
-	function vertex(a, b) {
-	  return -b / (2 * a)
-	}
-
-	function height(a, b, c) {
-	  return parabola(a, b, c, vertex(a, b))
-	}
-
-	function parabola(a, b, c, x) {
-	  return a * x * x + b * x + c
-	}
-
-	function eventVector(evt) {
-	  return Vector({
-	    x: evt.touches && evt.touches[0].pageX || evt.pageX,
-	    y: evt.touches && evt.touches[0].pageY || evt.pageY
-	  })
-	}
-
-	module.exports.height = height
-	module.exports.eventVector = eventVector
-
-/***/ },
-/* 17 */
-/***/ function(module, exports, __webpack_require__) {
-
 	/**
 	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
 	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
@@ -8831,7 +8655,7 @@
 	 * Available under MIT license <http://lodash.com/license>
 	 */
 	var keys = __webpack_require__(24),
-	    objectTypes = __webpack_require__(25);
+	    objectTypes = __webpack_require__(26);
 
 	/**
 	 * Assigns own enumerable properties of source object(s) to the destination
@@ -8879,15 +8703,15 @@
 
 
 /***/ },
-/* 18 */
+/* 15 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	//This file contains then/promise specific extensions to the core promise API
 
-	var Promise = __webpack_require__(23)
-	var asap = __webpack_require__(26)
+	var Promise = __webpack_require__(21)
+	var asap = __webpack_require__(25)
 
 	module.exports = Promise
 
@@ -9065,6 +8889,177 @@
 
 
 /***/ },
+/* 16 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var Vector = __webpack_require__(5)
+
+	module.exports = Body
+
+	function Body(vel, from, fns) {
+	  if(!(this instanceof Body)) return new Body(vel, from, fns)
+
+	  this.previousPosition = this.position = Vector(from)
+	  this.velocity = Vector(vel)
+	  this._fns = fns
+	}
+
+	Body.prototype.update = function(alpha) {
+	  var pos = this.previousPosition.clone().lerp(this.position, alpha)
+	  this._fns.update(pos, this.velocity)
+	}
+
+	Body.prototype.accelerate = function(state, t) {
+	  return this._fns.accelerate(state, t)
+	}
+
+	Body.prototype.atRest = function() {
+	  return this.velocity.norm() < .01
+	}
+
+	Body.prototype.atPosition = function(pos) {
+	  //return whether the distance between this.position and pos is less than .1
+	  return this.position.sub(Vector(pos)).norm() < .01
+	}
+
+
+/***/ },
+/* 17 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var defaults = __webpack_require__(14)
+	  , Promise = window.Promise || __webpack_require__(15)
+	  , Boundry = __webpack_require__(13)
+	  , Vector = __webpack_require__(5)
+	  , Emitter = __webpack_require__(23)
+
+	var proto = {
+	  to: function(x, y) {
+	    if(x instanceof Boundry)
+	      this._to = x
+	    else
+	      this._to = Vector(x, y)
+	    return this
+	  },
+
+	  velocity: function(x, y) {
+	    this._velocity = Vector(x, y)
+	    return this
+	  },
+
+	  from: function(x, y) {
+	    this._from = Vector(x, y)
+	    return this
+	  },
+
+	  _updateState: function(position, velocity) {
+	    this._phys.position(position)
+	    this._phys.velocity(velocity)
+	  },
+
+	  cancel: function() {
+	    this._onEnd()
+	    this._running = false
+	    this._reject()
+	  },
+
+	  running: function() {
+	    return this._running || false
+	  },
+
+	  start: function() {
+	    var that = this
+	      , from = (this._from) ? this._from : this._phys.position()
+	      , to = (this._to) ? this._to : this._phys.position()
+	      , velocity = (this._velocity) ? this._velocity : this._phys.velocity()
+	      , opts = defaults({}, this._opts || {}, this._defaultOpts)
+
+	    var update = {
+	      state: function(position, velocity) {
+	        that._updateState(position, velocity)
+	      },
+	      done: function(position, velocity) {
+	        that._updateState(position, velocity)
+	        that._onEnd()
+	        that._running = false
+	        that._resolve({ position: position, velocity: velocity })
+	      },
+	      cancel: function(position, velocity) {
+	        that._updateState(position, velocity)
+	        that._onEnd()
+	        that._running = false
+	        that._reject()
+	      }
+	    }
+	    this._phys._startAnimation(this)
+
+	    this._running = true
+	    if(to instanceof Boundry)
+	      to = to.nearestIntersect(from, velocity)
+	    this._onStart(velocity, from, to, opts, update)
+
+	    return that._ended
+	  }
+	}
+
+	function Animation(callbacks) {
+	  var animation = function(phys, opts) {
+	    var that = this
+	    this._opts = opts
+	    this._phys = phys
+	    this._onStart = callbacks.onStart
+	    this._onEnd = callbacks.onEnd
+	    this._defaultOpts = callbacks.defaultOptions
+
+	    this._ended = new Promise(function(resolve, reject) {
+	      that._resolve = resolve
+	      that._reject = reject
+	    })
+
+	    this.start = this.start.bind(this)
+	  }
+
+	  Emitter(animation.prototype)
+	  animation.prototype = proto
+
+	  return animation
+	}
+
+
+
+
+
+	module.exports = Animation
+
+
+/***/ },
+/* 18 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var Vector = __webpack_require__(5)
+	function vertex(a, b) {
+	  return -b / (2 * a)
+	}
+
+	function height(a, b, c) {
+	  return parabola(a, b, c, vertex(a, b))
+	}
+
+	function parabola(a, b, c, x) {
+	  return a * x * x + b * x + c
+	}
+
+	function eventVector(evt) {
+	  return Vector({
+	    x: evt.touches && evt.touches[0].pageX || evt.pageX,
+	    y: evt.touches && evt.touches[0].pageY || evt.pageY
+	  })
+	}
+
+	module.exports.height = height
+	module.exports.eventVector = eventVector
+
+/***/ },
 /* 19 */
 /***/ function(module, exports, __webpack_require__) {
 
@@ -9170,6 +9165,117 @@
 /* 21 */
 /***/ function(module, exports, __webpack_require__) {
 
+	'use strict';
+
+	var asap = __webpack_require__(25)
+
+	module.exports = Promise
+	function Promise(fn) {
+	  if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new')
+	  if (typeof fn !== 'function') throw new TypeError('not a function')
+	  var state = null
+	  var value = null
+	  var deferreds = []
+	  var self = this
+
+	  this.then = function(onFulfilled, onRejected) {
+	    return new Promise(function(resolve, reject) {
+	      handle(new Handler(onFulfilled, onRejected, resolve, reject))
+	    })
+	  }
+
+	  function handle(deferred) {
+	    if (state === null) {
+	      deferreds.push(deferred)
+	      return
+	    }
+	    asap(function() {
+	      var cb = state ? deferred.onFulfilled : deferred.onRejected
+	      if (cb === null) {
+	        (state ? deferred.resolve : deferred.reject)(value)
+	        return
+	      }
+	      var ret
+	      try {
+	        ret = cb(value)
+	      }
+	      catch (e) {
+	        deferred.reject(e)
+	        return
+	      }
+	      deferred.resolve(ret)
+	    })
+	  }
+
+	  function resolve(newValue) {
+	    try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
+	      if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.')
+	      if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
+	        var then = newValue.then
+	        if (typeof then === 'function') {
+	          doResolve(then.bind(newValue), resolve, reject)
+	          return
+	        }
+	      }
+	      state = true
+	      value = newValue
+	      finale()
+	    } catch (e) { reject(e) }
+	  }
+
+	  function reject(newValue) {
+	    state = false
+	    value = newValue
+	    finale()
+	  }
+
+	  function finale() {
+	    for (var i = 0, len = deferreds.length; i < len; i++)
+	      handle(deferreds[i])
+	    deferreds = null
+	  }
+
+	  doResolve(fn, resolve, reject)
+	}
+
+
+	function Handler(onFulfilled, onRejected, resolve, reject){
+	  this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null
+	  this.onRejected = typeof onRejected === 'function' ? onRejected : null
+	  this.resolve = resolve
+	  this.reject = reject
+	}
+
+	/**
+	 * Take a potentially misbehaving resolver function and make sure
+	 * onFulfilled and onRejected are only called once.
+	 *
+	 * Makes no guarantees about asynchrony.
+	 */
+	function doResolve(fn, onFulfilled, onRejected) {
+	  var done = false;
+	  try {
+	    fn(function (value) {
+	      if (done) return
+	      done = true
+	      onFulfilled(value)
+	    }, function (reason) {
+	      if (done) return
+	      done = true
+	      onRejected(reason)
+	    })
+	  } catch (ex) {
+	    if (done) return
+	    done = true
+	    onRejected(ex)
+	  }
+	}
+
+
+/***/ },
+/* 22 */
+/***/ function(module, exports, __webpack_require__) {
+
 	module.exports = Velocity
 
 	function Velocity() {
@@ -9209,7 +9315,7 @@
 
 
 /***/ },
-/* 22 */
+/* 23 */
 /***/ function(module, exports, __webpack_require__) {
 
 	
@@ -9379,117 +9485,6 @@
 
 
 /***/ },
-/* 23 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-
-	var asap = __webpack_require__(26)
-
-	module.exports = Promise
-	function Promise(fn) {
-	  if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new')
-	  if (typeof fn !== 'function') throw new TypeError('not a function')
-	  var state = null
-	  var value = null
-	  var deferreds = []
-	  var self = this
-
-	  this.then = function(onFulfilled, onRejected) {
-	    return new Promise(function(resolve, reject) {
-	      handle(new Handler(onFulfilled, onRejected, resolve, reject))
-	    })
-	  }
-
-	  function handle(deferred) {
-	    if (state === null) {
-	      deferreds.push(deferred)
-	      return
-	    }
-	    asap(function() {
-	      var cb = state ? deferred.onFulfilled : deferred.onRejected
-	      if (cb === null) {
-	        (state ? deferred.resolve : deferred.reject)(value)
-	        return
-	      }
-	      var ret
-	      try {
-	        ret = cb(value)
-	      }
-	      catch (e) {
-	        deferred.reject(e)
-	        return
-	      }
-	      deferred.resolve(ret)
-	    })
-	  }
-
-	  function resolve(newValue) {
-	    try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
-	      if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.')
-	      if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
-	        var then = newValue.then
-	        if (typeof then === 'function') {
-	          doResolve(then.bind(newValue), resolve, reject)
-	          return
-	        }
-	      }
-	      state = true
-	      value = newValue
-	      finale()
-	    } catch (e) { reject(e) }
-	  }
-
-	  function reject(newValue) {
-	    state = false
-	    value = newValue
-	    finale()
-	  }
-
-	  function finale() {
-	    for (var i = 0, len = deferreds.length; i < len; i++)
-	      handle(deferreds[i])
-	    deferreds = null
-	  }
-
-	  doResolve(fn, resolve, reject)
-	}
-
-
-	function Handler(onFulfilled, onRejected, resolve, reject){
-	  this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null
-	  this.onRejected = typeof onRejected === 'function' ? onRejected : null
-	  this.resolve = resolve
-	  this.reject = reject
-	}
-
-	/**
-	 * Take a potentially misbehaving resolver function and make sure
-	 * onFulfilled and onRejected are only called once.
-	 *
-	 * Makes no guarantees about asynchrony.
-	 */
-	function doResolve(fn, onFulfilled, onRejected) {
-	  var done = false;
-	  try {
-	    fn(function (value) {
-	      if (done) return
-	      done = true
-	      onFulfilled(value)
-	    }, function (reason) {
-	      if (done) return
-	      done = true
-	      onRejected(reason)
-	    })
-	  } catch (ex) {
-	    if (done) return
-	    done = true
-	    onRejected(ex)
-	  }
-	}
-
-
-/***/ },
 /* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
@@ -9501,9 +9496,9 @@
 	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <http://lodash.com/license>
 	 */
-	var isNative = __webpack_require__(28),
-	    isObject = __webpack_require__(31),
-	    shimKeys = __webpack_require__(30);
+	var isNative = __webpack_require__(31),
+	    isObject = __webpack_require__(30),
+	    shimKeys = __webpack_require__(28);
 
 	/* Native method shortcuts for methods with the same name as other `lodash` methods */
 	var nativeKeys = isNative(nativeKeys = Object.keys) && nativeKeys;
@@ -9533,32 +9528,6 @@
 
 /***/ },
 /* 25 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
-	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
-	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
-	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
-	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-	 * Available under MIT license <http://lodash.com/license>
-	 */
-
-	/** Used to determine if values are of the language type Object */
-	var objectTypes = {
-	  'boolean': false,
-	  'function': true,
-	  'object': true,
-	  'number': false,
-	  'string': false,
-	  'undefined': false
-	};
-
-	module.exports = objectTypes;
-
-
-/***/ },
-/* 26 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {
@@ -9678,6 +9647,32 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(29)))
 
 /***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
+	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+	 * Available under MIT license <http://lodash.com/license>
+	 */
+
+	/** Used to determine if values are of the language type Object */
+	var objectTypes = {
+	  'boolean': false,
+	  'function': true,
+	  'object': true,
+	  'number': false,
+	  'string': false,
+	  'undefined': false
+	};
+
+	module.exports = objectTypes;
+
+
+/***/ },
 /* 27 */
 /***/ function(module, exports, __webpack_require__) {
 
@@ -9732,32 +9727,36 @@
 	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <http://lodash.com/license>
 	 */
+	var objectTypes = __webpack_require__(26);
 
 	/** Used for native method references */
 	var objectProto = Object.prototype;
 
-	/** Used to resolve the internal [[Class]] of values */
-	var toString = objectProto.toString;
-
-	/** Used to detect if a method is native */
-	var reNative = RegExp('^' +
-	  String(toString)
-	    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-	    .replace(/toString| for [^\]]+/g, '.*?') + '$'
-	);
+	/** Native method shortcuts */
+	var hasOwnProperty = objectProto.hasOwnProperty;
 
 	/**
-	 * Checks if `value` is a native function.
+	 * A fallback implementation of `Object.keys` which produces an array of the
+	 * given object's own enumerable property names.
 	 *
 	 * @private
-	 * @param {*} value The value to check.
-	 * @returns {boolean} Returns `true` if the `value` is a native function, else `false`.
+	 * @type Function
+	 * @param {Object} object The object to inspect.
+	 * @returns {Array} Returns an array of property names.
 	 */
-	function isNative(value) {
-	  return typeof value == 'function' && reNative.test(value);
-	}
+	var shimKeys = function(object) {
+	  var index, iterable = object, result = [];
+	  if (!iterable) return result;
+	  if (!(objectTypes[typeof object])) return result;
+	    for (index in iterable) {
+	      if (hasOwnProperty.call(iterable, index)) {
+	        result.push(index);
+	      }
+	    }
+	  return result
+	};
 
-	module.exports = isNative;
+	module.exports = shimKeys;
 
 
 /***/ },
@@ -9841,51 +9840,7 @@
 	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 	 * Available under MIT license <http://lodash.com/license>
 	 */
-	var objectTypes = __webpack_require__(25);
-
-	/** Used for native method references */
-	var objectProto = Object.prototype;
-
-	/** Native method shortcuts */
-	var hasOwnProperty = objectProto.hasOwnProperty;
-
-	/**
-	 * A fallback implementation of `Object.keys` which produces an array of the
-	 * given object's own enumerable property names.
-	 *
-	 * @private
-	 * @type Function
-	 * @param {Object} object The object to inspect.
-	 * @returns {Array} Returns an array of property names.
-	 */
-	var shimKeys = function(object) {
-	  var index, iterable = object, result = [];
-	  if (!iterable) return result;
-	  if (!(objectTypes[typeof object])) return result;
-	    for (index in iterable) {
-	      if (hasOwnProperty.call(iterable, index)) {
-	        result.push(index);
-	      }
-	    }
-	  return result
-	};
-
-	module.exports = shimKeys;
-
-
-/***/ },
-/* 31 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
-	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
-	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
-	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
-	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-	 * Available under MIT license <http://lodash.com/license>
-	 */
-	var objectTypes = __webpack_require__(25);
+	var objectTypes = __webpack_require__(26);
 
 	/**
 	 * Checks if `value` is the language type of Object.
@@ -9916,6 +9871,46 @@
 	}
 
 	module.exports = isObject;
+
+
+/***/ },
+/* 31 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+	 * Build: `lodash modularize modern exports="npm" -o ./npm/`
+	 * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+	 * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+	 * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+	 * Available under MIT license <http://lodash.com/license>
+	 */
+
+	/** Used for native method references */
+	var objectProto = Object.prototype;
+
+	/** Used to resolve the internal [[Class]] of values */
+	var toString = objectProto.toString;
+
+	/** Used to detect if a method is native */
+	var reNative = RegExp('^' +
+	  String(toString)
+	    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	    .replace(/toString| for [^\]]+/g, '.*?') + '$'
+	);
+
+	/**
+	 * Checks if `value` is a native function.
+	 *
+	 * @private
+	 * @param {*} value The value to check.
+	 * @returns {boolean} Returns `true` if the `value` is a native function, else `false`.
+	 */
+	function isNative(value) {
+	  return typeof value == 'function' && reNative.test(value);
+	}
+
+	module.exports = isNative;
 
 
 /***/ }
