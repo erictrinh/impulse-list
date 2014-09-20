@@ -50,13 +50,10 @@ var draggables = [].map.call(items, function(elem, index, arr) {
     })
     .on('end', function() {
       draggable.spring({ tension: 120, damping: 10 }).to(0, 0).start();
-      vent.emit('end');
     });
 
   return draggable;
 });
-
-var newRects;
 
 vent.on('move', function(originalIndexOfMover, y) {
   // modify rects to represent where we want to go
@@ -74,9 +71,7 @@ vent.on('move', function(originalIndexOfMover, y) {
     return;
   }
 
-  newRects = reArrange(rects, currIndex, index);
-
-  // console.log('newRects', newRects.map(function(r) { return r.id + 1; }));
+  var newRects = reArrange(rects, currIndex, index);
 
   // re-calculate positions of all rects
 
@@ -108,14 +103,11 @@ vent.on('move', function(originalIndexOfMover, y) {
     }
   });
 
-
-});
-
-vent.on('end', function() {
+  // newRects might be null if we returned early during move step
   rects = newRects || rects;
-  // console.log('end', rects.map(function(r) { return r.id + 1; }));
-});
 
+
+});
 
 
 function findInsertionIndex(y) {
