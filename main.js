@@ -110,13 +110,7 @@
 	    return;
 	  }
 
-	  var mover = rects[indexOfMover];
-	  // deep clone
-	  var newRects = _.clone(rects, true);
-	  // remove the mover
-	  newRects.splice(indexOfMover, 1);
-	  // insert the mover after the intersecting index
-	  newRects.splice(index, 0, mover);
+	  var newRects = reArrange(rects, indexOfMover, index);
 
 	  // re-calculate positions of all rects
 
@@ -163,6 +157,18 @@
 	  }
 	}
 
+	// moves the position of an element at indexA to indexB
+	// other elements in the array stay in the same relative order
+	// returns new array
+	function reArrange(arr, indexA, indexB) {
+	  // deep clone
+	  var newArr = _.clone(arr, true);
+
+	  var elem = newArr.splice(indexA, 1)[0];
+	  newArr.splice(indexB, 0, elem);
+
+	  return newArr;
+	}
 
 
 /***/ },
