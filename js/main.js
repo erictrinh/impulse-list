@@ -50,12 +50,15 @@ var draggables = [].map.call(items, function(elem, index, arr) {
     })
     .on('end', function() {
       draggable.spring({ tension: 120, damping: 10 }).to(0, 0).start();
+      vent.emit('end');
     });
 
   return draggable;
 });
 
-vent.on('move', function(indexOfMover, y) {
+var newRects;
+
+vent.on('move', function(originalIndexOfMover, y) {
   // modify rects to represent where we want to go
 
   var index = findInsertionIndex(y);
@@ -64,7 +67,16 @@ vent.on('move', function(indexOfMover, y) {
     return;
   }
 
-  var newRects = reArrange(rects, indexOfMover, index);
+  var currIndex = _.findIndex(rects, { id: originalIndexOfMover });
+
+  // don't do any rendering if rect is where it should be
+  if (currIndex === index) {
+    return;
+  }
+
+  newRects = reArrange(rects, currIndex, index);
+
+  // console.log('newRects', newRects.map(function(r) { return r.id + 1; }));
 
   // re-calculate positions of all rects
 
@@ -98,6 +110,13 @@ vent.on('move', function(indexOfMover, y) {
 
 
 });
+
+vent.on('end', function() {
+  rects = newRects || rects;
+  // console.log('end', rects.map(function(r) { return r.id + 1; }));
+});
+
+
 
 function findInsertionIndex(y) {
   if (y < rects[0].top) {
