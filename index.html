@@ -13,6 +13,17 @@
     <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
 
     <!-- <link rel="stylesheet" href="css/main.css"> -->
+    <style>
+      .item {
+        padding: 10px;
+        margin: 10px;
+        background-color: rgb(223, 194, 255);
+      }
+
+      .handle {
+        float: right;
+      }
+    </style>
   </head>
   <body>
     <!--[if lt IE 7]>
@@ -20,11 +31,14 @@
     <![endif]-->
 
     <!-- Add your site or application content here -->
-    <ol style="font-size: 24px;">
-      <li class="list-item">This is item 1</li>
-      <li class="list-item">This is item 2</li>
-      <li class="list-item">This is item 3</li>
-    </ol>
+
+    <div style="font-size: 24px;">
+      <div class="item">This is item 1 <span class="handle">Handle</span></div>
+      <div class="item">This is item 2 <span class="handle">Handle</span></div>
+      <div class="item">This is item 3 <span class="handle">Handle</span></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 
     <script src="main.js"></script>
   </body>

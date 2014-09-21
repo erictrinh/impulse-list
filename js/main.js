@@ -18,7 +18,7 @@ var vent = new EventEmitter();
 
 var activeIndex;
 
-var items = document.getElementsByClassName('list-item');
+var items = document.getElementsByClassName('item');
 
 var drags = [];
 
@@ -26,9 +26,13 @@ var rects = [];
 
 var draggables = [].map.call(items, function(elem, index, arr) {
   var origRect = elem.getBoundingClientRect(),
-    rect = _.pick(origRect, ['height', 'width', 'left', 'bottom', 'right', 'top']);
+    styles = elem.currentStyle || window.getComputedStyle(elem),
+    margins = {
+      marginTop: parseInt(styles.marginTop),
+      marginBottom: parseInt(styles.marginBottom)
+    };
 
-  rect = _.extend(rect, { id: index });
+    rect = _.extend(_.pick(origRect, ['height', 'bottom', 'top']), margins, { id: index });
 
   rects.push(rect);
 
@@ -37,7 +41,7 @@ var draggables = [].map.call(items, function(elem, index, arr) {
       return x + 'px, ' + y + 'px';
     });
 
-  var dragObj = draggable.drag();
+  var dragObj = draggable.drag({ handle: elem.children });
 
   drags[index] = dragObj;
 
@@ -75,17 +79,7 @@ vent.on('move', function(originalIndexOfMover, y) {
 
   // re-calculate positions of all rects
 
-  var bottom = 0;
-  newRects = newRects.map(function(rect, index, arr) {
-    var top = index === 0 ? rects[0].top : bottom;
-
-    bottom = top + rect.height;
-
-    return _.extend(_.clone(rect), {
-      top: top,
-      bottom: bottom
-    });
-  });
+  newRects = reCalcRects(newRects, rects);
 
 
   // now go and render
@@ -108,6 +102,23 @@ vent.on('move', function(originalIndexOfMover, y) {
 
 
 });
+
+function reCalcRects(rects, origRects) {
+  var bottom = 0;
+  var marginBottom = 0;
+
+  return rects.map(function(rect, index, arr) {
+    var top = index === 0 ? origRects[0].top : (bottom + Math.max(rect.marginTop, marginBottom));
+
+    bottom = top + rect.height;
+    marginBottom = rect.marginBottom;
+
+    return _.extend(_.clone(rect), {
+      top: top,
+      bottom: bottom
+    });
+  });
+}
 
 
 function findInsertionIndex(y) {
